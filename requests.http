@@ -1,0 +1,20 @@
+# Try the system through the gateway (works in VS / VS Code REST Client / Rider).
+@gateway = http://localhost:5000
+
+### List products (Gateway -> ProductService)
+GET {{gateway}}/products
+
+### Place an order (Gateway -> OrderService -> ProductService, then event -> NotificationService)
+POST {{gateway}}/orders
+Content-Type: application/json
+
+{ "productId": 1, "quantity": 2 }
+
+### Unknown product -> 400
+POST {{gateway}}/orders
+Content-Type: application/json
+
+{ "productId": 99, "quantity": 1 }
+
+### List orders
+GET {{gateway}}/orders

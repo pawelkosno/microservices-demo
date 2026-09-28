@@ -1,0 +1,43 @@
+# Runs the whole system: message broker + 4 services.
+# Only the gateway (and RabbitMQ UI) is exposed to your machine - services talk to each other by name.
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports:
+      - "5672:5672"     # AMQP (for running services locally with `dotnet run`)
+      - "15672:15672"   # management UI: http://localhost:15672 (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  product-service:
+    build: { context: ., dockerfile: src/ProductService/Dockerfile }
+
+  order-service:
+    build: { context: ., dockerfile: src/OrderService/Dockerfile }
+    environment:
+      Services__ProductService: http://product-service:8080
+      RabbitMq__Host: rabbitmq
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+      product-service: { condition: service_started }
+
+  notification-service:
+    build: { context: ., dockerfile: src/NotificationService/Dockerfile }
+    environment:
+      RabbitMq__Host: rabbitmq
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+
+  gateway:
+    build: { context: ., dockerfile: src/Gateway/Dockerfile }
+    ports:
+      - "5000:8080"
+    environment:
+      ReverseProxy__Clusters__products__Destinations__d1__Address: http://product-service:8080/
+      ReverseProxy__Clusters__orders__Destinations__d1__Address: http://order-service:8080/
+    depends_on:
+      - product-service
+      - order-service
